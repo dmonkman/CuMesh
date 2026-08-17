@@ -1,6 +1,7 @@
+#include "hip/hip_runtime.h"
 #include "cumesh.h"
 #include "dtypes.cuh"
-#include <cub/cub.cuh>
+#include <hipcub/hipcub.hpp>
 
 
 namespace cumesh {
@@ -77,7 +78,7 @@ void get_qem(
         V, F,
         reinterpret_cast<QEM*>(ctx.temp_storage.ptr)
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 }
 
 
@@ -246,7 +247,7 @@ void get_edge_collapse_cost(
         lambda_edge_length, lambda_skinny,
         ctx.edge_collapse_costs.ptr
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 }
 
 
@@ -311,7 +312,7 @@ void propagate_cost(
         V, F, E,
         ctx.propagated_costs.ptr
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 }
 
 
@@ -466,22 +467,22 @@ void collapse_edges(
         ctx.vertices_map.ptr,
         ctx.faces_map.ptr
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
     
     // update vertices buffer
     // get vertices map
     size_t temp_storage_bytes = 0;
-    CUDA_CHECK(cub::DeviceScan::ExclusiveSum(
+    CUDA_CHECK(hipcub::DeviceScan::ExclusiveSum(
         nullptr, temp_storage_bytes,
         ctx.vertices_map.ptr, V+1
     ));
     ctx.cub_temp_storage.resize(temp_storage_bytes);
-    CUDA_CHECK(cub::DeviceScan::ExclusiveSum(
+    CUDA_CHECK(hipcub::DeviceScan::ExclusiveSum(
         ctx.cub_temp_storage.ptr, temp_storage_bytes,
         ctx.vertices_map.ptr, V+1
     ));
     int new_num_vertices;
-    CUDA_CHECK(cudaMemcpy(&new_num_vertices, ctx.vertices_map.ptr + V, sizeof(int), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(hipMemcpy(&new_num_vertices, ctx.vertices_map.ptr + V, sizeof(int), hipMemcpyDeviceToHost));
     // compress vertices
     ctx.temp_storage.resize(new_num_vertices * sizeof(float3));
     compress_vertices_kernel<<<(V+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
@@ -490,22 +491,22 @@ void collapse_edges(
         V,
         reinterpret_cast<float3*>(ctx.temp_storage.ptr)
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
     swap_buffers(ctx.temp_storage, ctx.vertices);
 
     // update faces buffer
     // get faces map
-    CUDA_CHECK(cub::DeviceScan::ExclusiveSum(
+    CUDA_CHECK(hipcub::DeviceScan::ExclusiveSum(
         nullptr, temp_storage_bytes,
         ctx.faces_map.ptr, F+1
     ));
     ctx.cub_temp_storage.resize(temp_storage_bytes);
-    CUDA_CHECK(cub::DeviceScan::ExclusiveSum(
+    CUDA_CHECK(hipcub::DeviceScan::ExclusiveSum(
         ctx.cub_temp_storage.ptr, temp_storage_bytes,
         ctx.faces_map.ptr, F+1
     ));
     int new_num_faces;
-    CUDA_CHECK(cudaMemcpy(&new_num_faces, ctx.faces_map.ptr + F, sizeof(int), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(hipMemcpy(&new_num_faces, ctx.faces_map.ptr + F, sizeof(int), hipMemcpyDeviceToHost));
     // compress faces
     ctx.temp_storage.resize(new_num_faces * sizeof(int3));
     compress_faces_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
@@ -515,7 +516,7 @@ void collapse_edges(
         F,
         reinterpret_cast<int3*>(ctx.temp_storage.ptr)
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
     swap_buffers(ctx.temp_storage, ctx.faces);
 }
 
@@ -526,7 +527,7 @@ std::tuple<int, int> CuMesh::simplify_step(float lambda_edge_length, float lambd
     if (timing) start = std::chrono::high_resolution_clock::now();
     this->get_vertex_face_adjacency();
     if (timing) {
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         end = std::chrono::high_resolution_clock::now();
         std::cout << "get_vertex_face_adjacency: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
     }
@@ -535,7 +536,7 @@ std::tuple<int, int> CuMesh::simplify_step(float lambda_edge_length, float lambd
     this->get_edges();
     this->get_boundary_info();
     if (timing) {
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         end = std::chrono::high_resolution_clock::now();
         std::cout << "get_edges: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
     }
@@ -543,7 +544,7 @@ std::tuple<int, int> CuMesh::simplify_step(float lambda_edge_length, float lambd
     if (timing) start = std::chrono::high_resolution_clock::now();
     get_qem(*this);
     if (timing) {
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         end = std::chrono::high_resolution_clock::now();
         std::cout << "get_qem: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
     }
@@ -551,7 +552,7 @@ std::tuple<int, int> CuMesh::simplify_step(float lambda_edge_length, float lambd
     if (timing) start = std::chrono::high_resolution_clock::now();
     get_edge_collapse_cost(*this, lambda_edge_length, lambda_skinny);
     if (timing) {
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         end = std::chrono::high_resolution_clock::now();
         std::cout << "get_edge_collapse_cost: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
     }
@@ -559,7 +560,7 @@ std::tuple<int, int> CuMesh::simplify_step(float lambda_edge_length, float lambd
     if (timing) start = std::chrono::high_resolution_clock::now();
     propagate_cost(*this);
     if (timing) {
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         end = std::chrono::high_resolution_clock::now();
         std::cout << "propagate_cost: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
     }
@@ -567,7 +568,7 @@ std::tuple<int, int> CuMesh::simplify_step(float lambda_edge_length, float lambd
     if (timing) start = std::chrono::high_resolution_clock::now();
     collapse_edges(*this, threshold);
     if (timing) {
-        CUDA_CHECK(cudaDeviceSynchronize());
+        CUDA_CHECK(hipDeviceSynchronize());
         end = std::chrono::high_resolution_clock::now();
         std::cout << "collapse_edges: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
     }
@@ -580,3 +581,4 @@ std::tuple<int, int> CuMesh::simplify_step(float lambda_edge_length, float lambd
 
 
 } // namespace cumesh
+

@@ -65,3 +65,4 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("get_sparse_voxel_grid_active_vertices", &cumesh::get_sparse_voxel_grid_active_vertices);
     m.def("simple_dual_contour", &cumesh::simple_dual_contour);
 }
+

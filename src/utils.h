@@ -1,21 +1,20 @@
 #pragma once
 
 #include <vector>
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <torch/extension.h>
 
 #define CUDA_CHECK(call)                                \
 do {                                                    \
-    const cudaError_t error_code = call;                \
-    if (error_code != cudaSuccess) {                    \
+    const hipError_t error_code = call;                \
+    if (error_code != hipSuccess) {                    \
         TORCH_CHECK(false,                              \
             "[CuMesh] CUDA error:\n",                   \
             "    File:       ", __FILE__, "\n",         \
             "    Line:       ", __LINE__, "\n",         \
             "    Error code: ", error_code, "\n",       \
             "    Error text: ",                         \
-            cudaGetErrorString(error_code), "\n");      \
+            hipGetErrorString(error_code), "\n");      \
     }                                                   \
 } while (0)
 
@@ -39,11 +38,11 @@ struct Buffer {
 
     void init(size_t capacity) {
         this->capacity = capacity;
-        CUDA_CHECK(cudaMalloc(&ptr, capacity * sizeof(T)));
+        CUDA_CHECK(hipMalloc(&ptr, capacity * sizeof(T)));
     }
 
     void free() {
-        if (ptr != nullptr) CUDA_CHECK(cudaFree(ptr));
+        if (ptr != nullptr) CUDA_CHECK(hipFree(ptr));
         ptr = nullptr;
         size = 0;
         capacity = 0;
@@ -61,9 +60,9 @@ struct Buffer {
         size_t new_size = size + this->size;
         if (new_size > capacity) {
             T* new_ptr;
-            CUDA_CHECK(cudaMalloc(&new_ptr, new_size * sizeof(T)));
-            CUDA_CHECK(cudaMemcpy(new_ptr, ptr, this->size * sizeof(T), cudaMemcpyDeviceToDevice));
-            CUDA_CHECK(cudaFree(ptr));
+            CUDA_CHECK(hipMalloc(&new_ptr, new_size * sizeof(T)));
+            CUDA_CHECK(hipMemcpy(new_ptr, ptr, this->size * sizeof(T), hipMemcpyDeviceToDevice));
+            CUDA_CHECK(hipFree(ptr));
             ptr = new_ptr;
             this->capacity = new_size;
         }
@@ -71,12 +70,12 @@ struct Buffer {
     }
 
     void zero() {
-        CUDA_CHECK(cudaMemset(ptr, 0, size * sizeof(T)));
+        CUDA_CHECK(hipMemset(ptr, 0, size * sizeof(T)));
     }
 
     void fill(T val) {
         std::vector<T> tmp(size, val);
-        CUDA_CHECK(cudaMemcpy(ptr, tmp.data(), size * sizeof(T), cudaMemcpyHostToDevice));
+        CUDA_CHECK(hipMemcpy(ptr, tmp.data(), size * sizeof(T), hipMemcpyHostToDevice));
     }
 };
 
@@ -103,3 +102,5 @@ void swap_buffers(Buffer<T1>& b1, Buffer<T2>& b2) {
 
 
 } // namespace cumesh
+
+

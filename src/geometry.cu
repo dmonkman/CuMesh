@@ -1,7 +1,8 @@
+#include "hip/hip_runtime.h"
 #include "cumesh.h"
 #include "dtypes.cuh"
 #include "shared.h"
-#include <cub/cub.cuh>
+#include <hipcub/hipcub.hpp>
 
 
 namespace cumesh {
@@ -32,7 +33,7 @@ void CuMesh::compute_face_areas() {
         F,
         this->face_areas.ptr
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 }
 
 
@@ -65,7 +66,7 @@ void CuMesh::compute_face_normals() {
         F,
         this->face_normals.ptr
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 }
 
 
@@ -123,8 +124,9 @@ void CuMesh::compute_vertex_normals() {
         V,
         this->vertex_normals.ptr
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 }
 
 
 } // namespace cumesh
+

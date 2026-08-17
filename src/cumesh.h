@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <torch/extension.h>
 
 #include "utils.h"
@@ -497,3 +496,5 @@ public:
 };
 
 } // namespace cumesh
+
+

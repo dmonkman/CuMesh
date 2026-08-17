@@ -1,7 +1,6 @@
+#include <hip/hip_runtime.h>
 #pragma once
 
-#include <cuda.h>
-#include <cuda_runtime.h>
 
 
 namespace cumesh {
@@ -322,3 +321,5 @@ __device__ __forceinline__ bool QEM::solve_optimal(float3 &out, float &err) cons
 
 
 } // namespace cumesh
+
+

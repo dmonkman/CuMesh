@@ -7,9 +7,9 @@
 #include <cstdint>
 #include <cmath>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_fp16.h>
 
 #include <Eigen/Dense>
 
@@ -39,7 +39,7 @@ constexpr uint32_t n_blocks_linear(T n_elements) {
 }
 
 template <typename K, typename T, typename ... Types>
-inline void linear_kernel(K kernel, uint32_t shmem_size, cudaStream_t stream, T n_elements, Types ... args) {
+inline void linear_kernel(K kernel, uint32_t shmem_size, hipStream_t stream, T n_elements, Types ... args) {
     if (n_elements <= 0) {
         return;
     }
@@ -106,3 +106,4 @@ inline __host__ __device__ float safe_divide(float numerator, float denominator,
 }
 
 }
+

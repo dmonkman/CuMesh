@@ -1,6 +1,5 @@
 #include <torch/extension.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 #include "api.h"
 #include "hash.cuh"
@@ -444,3 +443,4 @@ void cumesh::hashmap_insert_3d_idx_as_val_cuda(
         TORCH_CHECK(false, "Unsupported data type");
     }
 }
+

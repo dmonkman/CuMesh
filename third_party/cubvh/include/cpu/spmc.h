@@ -467,3 +467,4 @@ sparse_marching_cubes(const int* coords, const float* corners, int N, float iso,
 
 } // namespace cpu
 } // namespace cubvh
+
