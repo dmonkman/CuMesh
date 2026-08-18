@@ -1,28 +1,28 @@
 name: Build CuMesh ROCm wheel (Windows)
 
 # Cross-compiles a gfx1030 wheel on a GPU-less Windows runner using TheRock's
-# pip-installed ROCm toolchain.
+# pip-installed ROCm toolchain. Compilation does NOT need a physical AMD GPU;
 # --offload-arch targets the arch at build time. Runtime correctness still has
-# to be validated on real hardware.
+# to be validated on real hardware (the runner can't do that).
 
 on:
-  workflow_dispatch:   
+  workflow_dispatch:       
     inputs:
       gfx_arch:
         description: "GPU arch to target"
         default: "gfx1030"
         required: true
   release:
-    types: [created] 
+    types: [created]          
 
 permissions:
   contents: read
-  id-token: write   
+  id-token: write            
   attestations: write
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: rocm-gfx1030
-          submodules: recursive
+          submodules: recursive 
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -43,64 +43,8 @@ jobs:
       # sets up the dev environment so clang-cl and the Windows SDK are on PATH.
       - name: Set up MSVC dev environment
         uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Install build tooling + ROCm torch (TheRock multi-arch)
-        shell: pwsh
-        run: |
-          python -m pip install --upgrade pip wheel setuptools ninja
-          $arch = "${{ github.event.inputs.gfx_arch }}"
-          if (-not $arch) { $arch = "gfx1030" }   # default for release trigger
-          echo "GFX_ARCH=$arch" >> $env:GITHUB_ENV
-          # torch pulls the matching rocm[libraries] automatically
-          python -m pip install --index-url https://rocm.nightlies.amd.com/whl-multi-arch/ "torch[device-$arch]"
-          # devel packages provide the headers/device-libs needed to COMPILE
-          python -m pip install --index-url https://rocm.nightlies.amd.com/whl-multi-arch/ "rocm[libraries,devel,device-$arch]"
-
-name: Build CuMesh ROCm wheel (Windows)
-
-# Cross-compiles a gfx1030 wheel on a GPU-less Windows runner using TheRock's
-# pip-installed ROCm toolchain. Compilation does NOT need a physical AMD GPU;
-# --offload-arch targets the arch at build time. Runtime correctness still has
-# to be validated on real hardware (the runner can't do that).
-
-on:
-  workflow_dispatch:          # manual "Run workflow" button
-    inputs:
-      gfx_arch:
-        description: "GPU arch to target"
-        default: "gfx1030"
-        required: true
-  release:
-    types: [created]          # also build when you publish a release
-
-permissions:
-  contents: read
-  id-token: write             # required for build provenance attestation
-  attestations: write
-
-jobs:
-  build:
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12"]     # add "3.11" to widen coverage
-    steps:
-      - name: Checkout (rocm-gfx1030)
-        uses: actions/checkout@v4
         with:
-          ref: rocm-gfx1030
-          submodules: recursive       # CuMesh has cubvh + Eigen vendored/submodule'd
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      # MSVC/clang-cl toolchain. windows-latest has VS Build Tools; this action
-      # sets up the dev environment so clang-cl and the Windows SDK are on PATH.
-      - name: Set up MSVC dev environment
-        uses: ilammy/msvc-dev-cmd@v1
+          toolset: 14.44
 
       - name: Install build tooling + ROCm torch (TheRock multi-arch)
         shell: pwsh
@@ -143,43 +87,7 @@ jobs:
         shell: pwsh
         env:
           GPU_ARCHS: ${{ env.GFX_ARCH }}
-          DISTUTILS_USE_SDK: "1"       # let setuptools use the MSVC env we set up
-        run: |
-          Write-Host "Building for $env:GPU_ARCHS with ROCM_PATH=$env:ROCM_PATH"
-          python -m pip wheel . --no-build-isolation --no-deps -w dist -v 2>&1 | Tee-Object build.log
-          Get-ChildItem dist
-
-      - name: Upload build log (always, for debugging)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log-py${{ matrix.python-version }}
-          path: build.log
-
-      - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cumesh-${{ env.GFX_ARCH }}-py${{ matrix.python-version }}
-          path: dist/*.whl
-
-      # Cryptographically tie the wheel to this source + workflow run.
-      - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: dist/*.whl
-
-      # On a release, attach the wheel to it so users can pip-install by URL.
-      - name: Attach wheel to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.whl
-
-      - name: Build wheel (cross-compile for $GFX_ARCH)
-        shell: pwsh
-        env:
-          GPU_ARCHS: ${{ env.GFX_ARCH }}
-          DISTUTILS_USE_SDK: "1" 
+          DISTUTILS_USE_SDK: "1"   
         run: |
           Write-Host "Building for $env:GPU_ARCHS with ROCM_PATH=$env:ROCM_PATH"
           python -m pip wheel . --no-build-isolation --no-deps -w dist -v 2>&1 | Tee-Object build.log
