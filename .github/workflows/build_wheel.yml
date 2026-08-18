@@ -43,6 +43,8 @@ jobs:
       # sets up the dev environment so clang-cl and the Windows SDK are on PATH.
       - name: Set up MSVC dev environment
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          toolset: 14.4  
 
       - name: Install build tooling + ROCm torch (TheRock multi-arch)
         shell: pwsh
