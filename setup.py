@@ -34,8 +34,16 @@ else:
         "-fms-extensions", "-Wno-c++11-narrowing",
     ]
 
+# specify the version of torch that we are building CuMesh against
+import torch
+
+def _rocm_local():
+    v = torch.__version__            # e.g. "2.12.0+rocm7.14.0a20260624"
+    return "+" + v.split("+", 1)[1] if "+" in v else ""
+
 setup(
-    name="cumesh",
+    name="cumesh-rocm",
+    version="1.0" + _rocm_local(),
     packages=[
         'cumesh',
     ],

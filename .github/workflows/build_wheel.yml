@@ -6,18 +6,25 @@ name: Build CuMesh ROCm wheel (Windows)
 # to be validated on real hardware (the runner can't do that).
 
 on:
-  workflow_dispatch:       
+  workflow_dispatch:          # manual "Run workflow" button
     inputs:
       gfx_arch:
-        description: "GPU arch to target"
-        default: "gfx1030"
+        description: "GPU arch(s), semicolon-separated. Default = all sanity-tested."
+        default: "gfx1010;gfx1012;gfx1030;gfx1031;gfx1032;gfx1034;gfx1035;gfx1036;gfx1100;gfx1101;gfx1102;gfx1103;gfx1150;gfx1151"
+        required: true
+      torch_pin:
+        description: "Exact torch version to build against (7.14 line)."
+        default: "2.12.0+rocm7.14.0a20260624"
         required: true
   release:
-    types: [created]          
+    types: [created]          # also build when you publish a release
+
+env:
+  TORCH_PIN: ${{ github.event.inputs.torch_pin || '2.12.0+rocm7.14.0a20260624' }}
 
 permissions:
   contents: read
-  id-token: write            
+  id-token: write             # required for build provenance attestation
   attestations: write
 
 jobs:
@@ -26,13 +33,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.12"]     # add "3.11" to widen coverage
     steps:
       - name: Checkout (rocm-gfx1030)
         uses: actions/checkout@v4
         with:
           ref: rocm-gfx1030
-          submodules: recursive 
+          submodules: recursive       # CuMesh has cubvh + Eigen vendored/submodule'd
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -43,20 +50,20 @@ jobs:
       # sets up the dev environment so clang-cl and the Windows SDK are on PATH.
       - name: Set up MSVC dev environment
         uses: ilammy/msvc-dev-cmd@v1
-        with:
-          toolset: 14.44
 
       - name: Install build tooling + ROCm torch (TheRock multi-arch)
         shell: pwsh
         run: |
           python -m pip install --upgrade pip wheel setuptools ninja
           $arch = "${{ github.event.inputs.gfx_arch }}"
-          if (-not $arch) { $arch = "gfx1030" }   # default for release trigger
+          if (-not $arch) { $arch = "gfx1010;gfx1012;gfx1030;gfx1031;gfx1032;gfx1034;gfx1035;gfx1036;gfx1100;gfx1101;gfx1102;gfx1103;gfx1150;gfx1151" }
           echo "GFX_ARCH=$arch" >> $env:GITHUB_ENV
-          # torch pulls the matching rocm[libraries] automatically
-          python -m pip install --index-url https://rocm.nightlies.amd.com/whl-multi-arch/ "torch[device-$arch]"
-          # devel packages provide the headers/device-libs needed to COMPILE
-          python -m pip install --index-url https://rocm.nightlies.amd.com/whl-multi-arch/ "rocm[libraries,devel,device-$arch]"
+          # Pin to the 7.14 production line (more stable than 10.1 nightlies).
+          # torch exact version required (local version can't be wildcarded);
+          # rocm can use 7.14.* to accept any 7.14 patch. --pre needed for the alpha suffix.
+          python -m pip install --pre --index-url https://rocm.nightlies.amd.com/whl-multi-arch/ `
+            "torch==$env:TORCH_PIN" `
+            "rocm[libraries,devel,device-all]==7.14.*"
 
       - name: Discover ROCm path + put clang on PATH
         shell: pwsh
@@ -87,7 +94,7 @@ jobs:
         shell: pwsh
         env:
           GPU_ARCHS: ${{ env.GFX_ARCH }}
-          DISTUTILS_USE_SDK: "1"   
+          DISTUTILS_USE_SDK: "1"       # let setuptools use the MSVC env we set up
         run: |
           Write-Host "Building for $env:GPU_ARCHS with ROCM_PATH=$env:ROCM_PATH"
           python -m pip wheel . --no-build-isolation --no-deps -w dist -v 2>&1 | Tee-Object build.log
@@ -103,7 +110,7 @@ jobs:
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cumesh-${{ env.GFX_ARCH }}-py${{ matrix.python-version }}
+          name: cumesh-multiarch-py${{ matrix.python-version }}
           path: dist/*.whl
 
       # Cryptographically tie the wheel to this source + workflow run.
