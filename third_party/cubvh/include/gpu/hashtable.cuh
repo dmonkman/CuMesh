@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #pragma once
 
 #include <gpu/common.h>
@@ -174,7 +175,7 @@ struct HashTableInt {
 
     // Initialize/prepare table (set all slots to -1)
     // table_kvs: [capacity * 2]
-    void prepare(cudaStream_t stream) {
+    void prepare(hipStream_t stream) {
         if (capacity <= 0) return;
         const uint32_t tpb = 256u;
         const uint32_t blocks = (uint32_t)div_round_up(capacity, (int)tpb);
@@ -183,7 +184,7 @@ struct HashTableInt {
 
     // Insert a batch of coords
     // d_coords_in: [n_keys * num_dims]
-    void insert(const int* d_coords_in, int n_keys, cudaStream_t stream) {
+    void insert(const int* d_coords_in, int n_keys, hipStream_t stream) {
         d_coords = d_coords_in;
         num_coords = n_keys;
         if (capacity <= 0 || n_keys <= 0) return;
@@ -195,7 +196,7 @@ struct HashTableInt {
 
     // Build convenience: set capacity, prepare, then insert in one call
     // d_coords_in: [n_keys * num_dims]
-    void build(const int* d_coords_in, int n_keys, cudaStream_t stream) {
+    void build(const int* d_coords_in, int n_keys, hipStream_t stream) {
         // initialize capacity = max(16, 2 * n_keys)
         int desired_capacity = n_keys * 2;
         if (desired_capacity < 16) desired_capacity = 16;
@@ -207,7 +208,7 @@ struct HashTableInt {
     // Search a batch of queries; writes index or -1 per query
     // d_queries:     [n_queries * num_dims]
     // d_out_indices: [n_queries]
-    void search(const int* d_queries, int n_queries, int* d_out_indices, cudaStream_t stream) const {
+    void search(const int* d_queries, int n_queries, int* d_out_indices, hipStream_t stream) const {
         if (capacity <= 0 || n_queries <= 0) return;
         const uint32_t tpb = 256u;
         const uint32_t blocks = (uint32_t)div_round_up(n_queries, (int)tpb);
@@ -216,3 +217,5 @@ struct HashTableInt {
 };
 
 } // namespace cubvh
+
+

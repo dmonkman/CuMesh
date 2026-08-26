@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <cub/cub.cuh>
 #include "utils.h"
 #include "cumesh.h"
@@ -160,11 +159,11 @@ template<typename T>
 int compress_ids(T* ids, size_t N, Buffer<char>& cub_temp_storage, T* inverse=nullptr) {
     int *cu_indices, *cu_indices_argsorted;
     T *cu_ids_sorted;
-    CUDA_CHECK(cudaMalloc(&cu_indices, N * sizeof(int)));
-    CUDA_CHECK(cudaMalloc(&cu_indices_argsorted, N * sizeof(int)));
-    CUDA_CHECK(cudaMalloc(&cu_ids_sorted, N * sizeof(T)));
+    CUDA_CHECK(hipMalloc(&cu_indices, N * sizeof(int)));
+    CUDA_CHECK(hipMalloc(&cu_indices_argsorted, N * sizeof(int)));
+    CUDA_CHECK(hipMalloc(&cu_ids_sorted, N * sizeof(T)));
     arange_kernel<<<(N+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(cu_indices, N);
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
     size_t temp_storage_bytes = 0;
     CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
         nullptr, temp_storage_bytes,
@@ -179,22 +178,22 @@ int compress_ids(T* ids, size_t N, Buffer<char>& cub_temp_storage, T* inverse=nu
         cu_indices, cu_indices_argsorted,
         N
     ));
-    CUDA_CHECK(cudaFree(cu_indices));
+    CUDA_CHECK(hipFree(cu_indices));
 
     // get diff
     T* cu_new_ids;
-    CUDA_CHECK(cudaMalloc(&cu_new_ids, N * sizeof(T)));
+    CUDA_CHECK(hipMalloc(&cu_new_ids, N * sizeof(T)));
     get_diff_kernel<<<(N+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
         cu_ids_sorted,
         cu_new_ids,
         N
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 
     // inverse
     if (inverse) {
         int* cu_num;
-        CUDA_CHECK(cudaMalloc(&cu_num, sizeof(int)));
+        CUDA_CHECK(hipMalloc(&cu_num, sizeof(int)));
         temp_storage_bytes = 0;
         CUDA_CHECK(cub::DeviceSelect::Flagged(
             nullptr, temp_storage_bytes,
@@ -207,9 +206,9 @@ int compress_ids(T* ids, size_t N, Buffer<char>& cub_temp_storage, T* inverse=nu
             cu_ids_sorted, cu_new_ids, inverse, cu_num,
             N
         ));
-        CUDA_CHECK(cudaFree(cu_num));
+        CUDA_CHECK(hipFree(cu_num));
     }
-    CUDA_CHECK(cudaFree(cu_ids_sorted));
+    CUDA_CHECK(hipFree(cu_ids_sorted));
     
     // scan diff
     temp_storage_bytes = 0;
@@ -232,12 +231,12 @@ int compress_ids(T* ids, size_t N, Buffer<char>& cub_temp_storage, T* inverse=nu
         N,
         ids
     );
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
     T num_components;
-    CUDA_CHECK(cudaMemcpy(&num_components, cu_new_ids + N-1, sizeof(T), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(hipMemcpy(&num_components, cu_new_ids + N-1, sizeof(T), hipMemcpyDeviceToHost));
     num_components += 1;
-    CUDA_CHECK(cudaFree(cu_new_ids));
-    CUDA_CHECK(cudaFree(cu_indices_argsorted));
+    CUDA_CHECK(hipFree(cu_new_ids));
+    CUDA_CHECK(hipFree(cu_indices_argsorted));
 
     return static_cast<int>(num_components);
 }
@@ -248,7 +247,7 @@ int compress_ids(T* ids, size_t N, Buffer<char>& cub_temp_storage, T* inverse=nu
 template <typename T>
 void print_max_val(T* ptr, size_t size) {
     T* dbg_cu_max_val;
-    CUDA_CHECK(cudaMalloc(&dbg_cu_max_val, sizeof(T)));
+    CUDA_CHECK(hipMalloc(&dbg_cu_max_val, sizeof(T)));
     size_t temp_storage_bytes = 0;
     CUDA_CHECK(cub::DeviceReduce::Max(
         nullptr, temp_storage_bytes,
@@ -257,7 +256,7 @@ void print_max_val(T* ptr, size_t size) {
         size
     ));
     char* temp_storage;
-    CUDA_CHECK(cudaMalloc(&temp_storage, temp_storage_bytes));
+    CUDA_CHECK(hipMalloc(&temp_storage, temp_storage_bytes));
     CUDA_CHECK(cub::DeviceReduce::Max(
         temp_storage, temp_storage_bytes,
         ptr,
@@ -265,16 +264,16 @@ void print_max_val(T* ptr, size_t size) {
         size
     ));
     T h_max_val;
-    CUDA_CHECK(cudaMemcpy(&h_max_val, dbg_cu_max_val, sizeof(T), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(hipMemcpy(&h_max_val, dbg_cu_max_val, sizeof(T), hipMemcpyDeviceToHost));
     std::cout << "Max value: " << h_max_val << std::endl;
-    CUDA_CHECK(cudaFree(dbg_cu_max_val));
-    CUDA_CHECK(cudaFree(temp_storage));
+    CUDA_CHECK(hipFree(dbg_cu_max_val));
+    CUDA_CHECK(hipFree(temp_storage));
 }
 
 template <typename T>
 void print_val(T* ptr, size_t size) {
     T h_ptr[size];
-    CUDA_CHECK(cudaMemcpy(h_ptr, ptr, size * sizeof(T), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(hipMemcpy(h_ptr, ptr, size * sizeof(T), hipMemcpyDeviceToHost));
     for (size_t i = 0; i < size; i++) {
         std::cout << h_ptr[i] << " ";
     }
@@ -283,3 +282,4 @@ void print_val(T* ptr, size_t size) {
 
 
 } // namespace cumesh
+

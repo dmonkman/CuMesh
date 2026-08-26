@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include "shared.h"
 
 
@@ -65,3 +66,4 @@ __global__ void compress_components_kernel(
 
 
 } // namespace cumesh
+

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include "cumesh.h"
 
 
@@ -85,21 +86,21 @@ static torch::Tensor buffer_to_tensor(const Buffer<T> buffer) {
 
     static constexpr int dst_bytes = Mapping::sizeof_scalar * Mapping::channels;
     if (sizeof(T) == dst_bytes) {
-        CUDA_CHECK(cudaMemcpy(
+        CUDA_CHECK(hipMemcpy(
             tensor.data_ptr(),
             buffer.ptr,
             count * sizeof(T),
-            cudaMemcpyDeviceToDevice
+            hipMemcpyDeviceToDevice
         ));
     } else {
-        CUDA_CHECK(cudaMemcpy2D(
+        CUDA_CHECK(hipMemcpy2D(
             tensor.data_ptr(),
             dst_bytes,
             buffer.ptr,
             sizeof(T),
             dst_bytes,
             count,
-            cudaMemcpyDeviceToDevice
+            hipMemcpyDeviceToDevice
         ));
     }
 
@@ -112,23 +113,23 @@ void CuMesh::init(const torch::Tensor& vertices, const torch::Tensor& faces) {
     size_t num_faces = faces.size(0);
     this->vertices.resize(num_vertices);
     this->faces.resize(num_faces);
-    CUDA_CHECK(cudaMemcpy2D(
+    CUDA_CHECK(hipMemcpy2D(
         this->vertices.ptr,
         sizeof(float3),
         vertices.data_ptr<float>(),
         sizeof(float) * 3,
         sizeof(float) * 3,
         num_vertices,
-        cudaMemcpyDeviceToDevice
+        hipMemcpyDeviceToDevice
     ));
-    CUDA_CHECK(cudaMemcpy2D(
+    CUDA_CHECK(hipMemcpy2D(
         this->faces.ptr,
         sizeof(int3),
         faces.data_ptr<int>(),
         sizeof(int) * 3,
         sizeof(int) * 3,
         num_faces,
-        cudaMemcpyDeviceToDevice
+        hipMemcpyDeviceToDevice
     ));
 }
 
@@ -248,3 +249,4 @@ std::unordered_map<std::string, torch::Tensor> CuMesh::read_all_cache() {
 
 
 } // namespace cumesh
+

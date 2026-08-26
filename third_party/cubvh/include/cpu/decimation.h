@@ -153,7 +153,7 @@ struct QuadricT {
 
 template <typename T>
 inline QuadricT<T> planeQuadric(const Vec3T<T>& n_unit, const Vec3T<T>& p){
-	// distance to plane: n·x - d, with d = n·p
+	// distance to plane: n?x - d, with d = n?p
 	T d = dot(n_unit, p);
 	Mat3T<T> A = outer(n_unit, n_unit);
 	Vec3T<T> b = n_unit * (-d);
@@ -331,7 +331,7 @@ public:
 
 		compact();
 	}
-	// Count common neighbors of an edge’s endpoints; reject if too many.
+	// Count common neighbors of an edge?s endpoints; reject if too many.
 	bool tooManyCommonNeighbors(const EdgeInfo<T>& e) const {
 		// Collect neighbor sets for v0 and v1, excluding the opposite endpoint
 		// and excluding the third vertices of faces incident to this edge.
@@ -552,7 +552,7 @@ private:
 		v_deleted[v1] = 1;
 		v_faces[v1].clear();
 		// Remove edges incident to v1
-		// We leave them invalid; they’ll be skipped lazily
+		// We leave them invalid; they?ll be skipped lazily
 		return true;
 	}
 
@@ -694,3 +694,5 @@ using Decimator = Decimatord;
 } // namespace qd
 } // namespace cpu
 } // namespace cubvh
+
+

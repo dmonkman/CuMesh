@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 // #include <Eigen/Dense>
 #include <gpu/common.h>
 #include <gpu/triangle.cuh>
@@ -427,7 +428,7 @@ public:
     }
 
 
-    void signed_distance_gpu(uint32_t n_elements, uint32_t mode, const float* positions, float* distances, int64_t* face_id, float* uvw, const Triangle* gpu_triangles, cudaStream_t stream) override {
+    void signed_distance_gpu(uint32_t n_elements, uint32_t mode, const float* positions, float* distances, int64_t* face_id, float* uvw, const Triangle* gpu_triangles, hipStream_t stream) override {
 
         const Vector3f* positions_vec = (const Vector3f*)positions;
         Vector3f* uvw_vec = (Vector3f*)uvw;
@@ -460,7 +461,7 @@ public:
         }
     }
 
-    void unsigned_distance_gpu(uint32_t n_elements, const float* positions, float* distances, int64_t* face_id, float* uvw, const Triangle* gpu_triangles, cudaStream_t stream) override {
+    void unsigned_distance_gpu(uint32_t n_elements, const float* positions, float* distances, int64_t* face_id, float* uvw, const Triangle* gpu_triangles, hipStream_t stream) override {
 
         const Vector3f* positions_vec = (const Vector3f*)positions;
         Vector3f* uvw_vec = (Vector3f*)uvw;
@@ -477,7 +478,7 @@ public:
         );
     }
 
-    void ray_trace_gpu(uint32_t n_elements, const float* rays_o, const float* rays_d, float* positions, int64_t* face_id, float* depth, const Triangle* gpu_triangles, cudaStream_t stream) override {
+    void ray_trace_gpu(uint32_t n_elements, const float* rays_o, const float* rays_d, float* positions, int64_t* face_id, float* depth, const Triangle* gpu_triangles, hipStream_t stream) override {
 
         // cast float* to Vector3f*
         const Vector3f* rays_o_vec = (const Vector3f*)rays_o;
@@ -724,3 +725,4 @@ __global__ void raytrace_kernel(
 }
     
 }
+

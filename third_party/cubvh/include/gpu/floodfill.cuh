@@ -1,5 +1,6 @@
-#include <cuda.h>  
-#include <cuda_runtime.h>
+#include "hip/hip_runtime.h"
+#include <hip/hip_runtime.h>  
+#include <hip/hip_runtime.h>
 
 #include <cstdint>
 #include <cmath>
@@ -43,7 +44,7 @@ __global__ void hookBatch(
 
     /* ---------- local coordinates inside the current volume -------------- */  
     int batch_idx = idx / Nvol;        // which batch this voxel belongs to
-    int local = idx % Nvol;            // 0 … Nvol-1  
+    int local = idx % Nvol;            // 0 ??? Nvol-1  
     int x =  local % W;  
     int y = (local / W) % H;  
     int z =  local / (W * H);
@@ -151,8 +152,8 @@ static int divUp(int a, int b) { return (a + b - 1) / b; }
 /* ------------------------------------------------------------------------- */
 
 /*  
- * grid  : pointer to B·H·W·D bools (0 = free, 1 = blocked)  
- * mask  : output, B·H·W·D int32 labels  
+ * grid  : pointer to B??H??W??D bools (0 = free, 1 = blocked)  
+ * mask  : output, B??H??W??D int32 labels  
  */  
 extern "C"  
 void _floodfill_batch(  
@@ -171,25 +172,25 @@ void _floodfill_batch(
     int  *d_labels  = nullptr;  
     int  *d_changed = nullptr;
 
-    cudaMalloc(&d_grid,    bytesGrid);  
-    cudaMalloc(&d_labels,  bytesLabel);  
-    cudaMalloc(&d_changed, sizeof(int));
+    hipMalloc(&d_grid,    bytesGrid);  
+    hipMalloc(&d_labels,  bytesLabel);  
+    hipMalloc(&d_changed, sizeof(int));
 
-    cudaMemcpy(d_grid, grid, bytesGrid, cudaMemcpyHostToDevice);
+    hipMemcpy(d_grid, grid, bytesGrid, hipMemcpyHostToDevice);
 
     /* --------------------------- init ------------------------------------ */  
     {  
         int blocks = divUp(Ntot, THREADS_PER_BLOCK);  
         initLabels<<<blocks, THREADS_PER_BLOCK>>>(d_grid, d_labels, Ntot);  
-        cudaDeviceSynchronize();
+        hipDeviceSynchronize();
         
         // Check for kernel launch errors
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("CUDA Error in initLabels: %s\n", cudaGetErrorString(err));
-            cudaFree(d_grid);
-            cudaFree(d_labels);
-            cudaFree(d_changed);
+        hipError_t err = hipGetLastError();
+        if (err != hipSuccess) {
+            printf("CUDA Error in initLabels: %s\n", hipGetErrorString(err));
+            hipFree(d_grid);
+            hipFree(d_labels);
+            hipFree(d_changed);
             return;
         }
     }
@@ -205,7 +206,7 @@ void _floodfill_batch(
     int no_change_count = 0;  // Track consecutive iterations with no changes
     
     while (h_changed && iteration < MAX_ITERATIONS) {  
-        cudaMemset(d_changed, 0, sizeof(int));
+        hipMemset(d_changed, 0, sizeof(int));
 
         /* hook */  
         {  
@@ -221,16 +222,16 @@ void _floodfill_batch(
             compress<<<blocks, THREADS_PER_BLOCK>>>(d_labels, Ntot);  
         }
 
-        cudaDeviceSynchronize();
+        hipDeviceSynchronize();
         
         // Check for kernel errors
-        cudaError_t err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("CUDA Error in iteration %d: %s\n", iteration, cudaGetErrorString(err));
+        hipError_t err = hipGetLastError();
+        if (err != hipSuccess) {
+            printf("CUDA Error in iteration %d: %s\n", iteration, hipGetErrorString(err));
             break;
         }
         
-        cudaMemcpy(&h_changed, d_changed, sizeof(int), cudaMemcpyDeviceToHost);
+        hipMemcpy(&h_changed, d_changed, sizeof(int), hipMemcpyDeviceToHost);
         iteration++;
         
         // Early termination: if no changes for several iterations, we've likely converged
@@ -259,14 +260,16 @@ void _floodfill_batch(
     {  
         int blocks = divUp(Ntot, THREADS_PER_BLOCK);  
         compress<<<blocks, THREADS_PER_BLOCK>>>(d_labels, Ntot);  
-        cudaDeviceSynchronize();  
+        hipDeviceSynchronize();  
     }
 
     /* copy back */  
-    cudaMemcpy(mask, d_labels, bytesLabel, cudaMemcpyDeviceToHost);
+    hipMemcpy(mask, d_labels, bytesLabel, hipMemcpyDeviceToHost);
 
     /* cleanup */  
-    cudaFree(d_grid);  
-    cudaFree(d_labels);  
-    cudaFree(d_changed);  
+    hipFree(d_grid);  
+    hipFree(d_labels);  
+    hipFree(d_changed);  
 }  
+
+

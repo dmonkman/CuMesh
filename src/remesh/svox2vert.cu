@@ -1,7 +1,8 @@
+#include "hip/hip_runtime.h"
 #include <torch/extension.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cub/cub.cuh>
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime.h>
+#include <hipcub/hipcub.hpp>
 
 #include "api.h"
 #include "../utils.h"
@@ -143,7 +144,7 @@ torch::Tensor cumesh::get_sparse_voxel_grid_active_vertices(
     size_t M = coords.size(0);
     size_t N = hashmap_keys.size(0);
     int* num_vertices;
-    CUDA_CHECK(cudaMalloc(&num_vertices, (M + 1) * sizeof(int)));
+    CUDA_CHECK(hipMalloc(&num_vertices, (M + 1) * sizeof(int)));
     if (hashmap_keys.dtype() == torch::kUInt32) {
         get_vertex_num<<<(M + BLOCK_SIZE - 1) / BLOCK_SIZE, BLOCK_SIZE>>>(
             N,
@@ -171,17 +172,17 @@ torch::Tensor cumesh::get_sparse_voxel_grid_active_vertices(
     } else {
         TORCH_CHECK(false, "Unsupported data type");
     }
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 
     // Compute the offset 
     size_t temp_storage_bytes = 0;
-    cub::DeviceScan::ExclusiveSum(nullptr, temp_storage_bytes, num_vertices, M + 1);
+    hipcub::DeviceScan::ExclusiveSum(nullptr, temp_storage_bytes, num_vertices, M + 1);
     void* d_temp_storage = nullptr;
-    CUDA_CHECK(cudaMalloc(&d_temp_storage, temp_storage_bytes));
-    cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, num_vertices, M + 1);
-    CUDA_CHECK(cudaFree(d_temp_storage));
+    CUDA_CHECK(hipMalloc(&d_temp_storage, temp_storage_bytes));
+    hipcub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, num_vertices, M + 1);
+    CUDA_CHECK(hipFree(d_temp_storage));
     int total_vertices;
-    CUDA_CHECK(cudaMemcpy(&total_vertices, num_vertices + M, sizeof(int), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(hipMemcpy(&total_vertices, num_vertices + M, sizeof(int), hipMemcpyDeviceToHost));
 
     // Set the active vertices for each voxel
     auto vertices = torch::empty({total_vertices, 3}, torch::dtype(torch::kInt32).device(hashmap_keys.device()));
@@ -213,10 +214,11 @@ torch::Tensor cumesh::get_sparse_voxel_grid_active_vertices(
             vertices.data_ptr<int32_t>()
         );
     }
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
 
     // Free the temporary memory
-    CUDA_CHECK(cudaFree(num_vertices));
+    CUDA_CHECK(hipFree(num_vertices));
 
     return vertices;
 }
+

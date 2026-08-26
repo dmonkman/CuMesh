@@ -1,6 +1,7 @@
+#include "hip/hip_runtime.h"
 #include <torch/extension.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime.h>
 #include <vector>
 
 #include "api.h"
@@ -218,6 +219,7 @@ std::tuple<torch::Tensor, torch::Tensor> cumesh::simple_dual_contour(
         TORCH_CHECK(false, "Unsupported hashmap data type");
     }
 
-    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(hipGetLastError());
     return std::make_tuple(vertices, intersected);
 }
+

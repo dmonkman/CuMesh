@@ -24,7 +24,7 @@
  */
 
 /** @file   gpu_memory.h
- *  @author Nikolaus Binder and Thomas Müller, NVIDIA
+ *  @author Nikolaus Binder and Thomas M?ller, NVIDIA
  *  @brief  Managed memory on the GPU. Like a std::vector, memory is alocated  either explicitly (resize/enlarge)
  *          or implicitly (resize_and_copy_from_host etc). Memory is always and automatically released in the destructor.
  */
@@ -41,9 +41,9 @@
 /// Checks the result of a cudaXXXXXX call and throws an error on failure
 #define CUDA_CHECK_THROW(x)                                                                                               \
     do {                                                                                                                  \
-        cudaError_t result = x;                                                                                           \
-        if (result != cudaSuccess)                                                                                        \
-            throw std::runtime_error(std::string("CUDA Error: " #x " failed with error ") + cudaGetErrorString(result));  \
+        hipError_t result = x;                                                                                           \
+        if (result != hipSuccess)                                                                                        \
+            throw std::runtime_error(std::string("CUDA Error: " #x " failed with error ") + hipGetErrorString(result));  \
     } while(0)
 
 
@@ -85,12 +85,12 @@ public:
             return;
         uint8_t buf[DEBUG_GUARD_SIZE];
         const uint8_t *rawptr=(const uint8_t *)m_data;
-        cudaMemcpy(buf, rawptr-DEBUG_GUARD_SIZE, DEBUG_GUARD_SIZE, cudaMemcpyDeviceToHost);
+        hipMemcpy(buf, rawptr-DEBUG_GUARD_SIZE, DEBUG_GUARD_SIZE, hipMemcpyDeviceToHost);
         for (int i=0;i<DEBUG_GUARD_SIZE;++i) if (buf[i] != 0xff) {
             printf("TRASH BEFORE BLOCK offset %d data %p, read 0x%02x expected 0xff!\n", i, m_data, buf[i] );
             break;
         }
-        cudaMemcpy(buf, rawptr+m_size*sizeof(T), DEBUG_GUARD_SIZE, cudaMemcpyDeviceToHost);
+        hipMemcpy(buf, rawptr+m_size*sizeof(T), DEBUG_GUARD_SIZE, hipMemcpyDeviceToHost);
         for (int i=0;i<DEBUG_GUARD_SIZE;++i) if (buf[i] != 0xfe) {
             printf("TRASH AFTER BLOCK offset %d data %p, read 0x%02x expected 0xfe!\n", i, m_data, buf[i] );
             break;
@@ -108,10 +108,10 @@ public:
 #endif
 
         uint8_t *rawptr = nullptr;
-        CUDA_CHECK_THROW(cudaMalloc(&rawptr, n_bytes+DEBUG_GUARD_SIZE*2));
+        CUDA_CHECK_THROW(hipMalloc(&rawptr, n_bytes+DEBUG_GUARD_SIZE*2));
 #if DEBUG_GUARD_SIZE > 0
-        CUDA_CHECK_THROW(cudaMemset(rawptr , 0xff, DEBUG_GUARD_SIZE));
-        CUDA_CHECK_THROW(cudaMemset(rawptr+n_bytes+DEBUG_GUARD_SIZE , 0xfe, DEBUG_GUARD_SIZE));
+        CUDA_CHECK_THROW(hipMemset(rawptr , 0xff, DEBUG_GUARD_SIZE));
+        CUDA_CHECK_THROW(hipMemset(rawptr+n_bytes+DEBUG_GUARD_SIZE , 0xfe, DEBUG_GUARD_SIZE));
 #endif
         if (rawptr) rawptr+=DEBUG_GUARD_SIZE;
         m_data=(T*)(rawptr);
@@ -125,7 +125,7 @@ public:
 
         uint8_t *rawptr = (uint8_t*)m_data;
         if (rawptr) rawptr-=DEBUG_GUARD_SIZE;
-        CUDA_CHECK_THROW(cudaFree(rawptr));
+        CUDA_CHECK_THROW(hipFree(rawptr));
 
         total_n_bytes_allocated() -= get_bytes();
 
@@ -206,7 +206,7 @@ public:
         }
 
         try {
-            CUDA_CHECK_THROW(cudaMemset(m_data + offset, value, num_elements * sizeof(T)));
+            CUDA_CHECK_THROW(hipMemset(m_data + offset, value, num_elements * sizeof(T)));
         } catch (std::runtime_error error) {
             throw std::runtime_error(std::string("Could not set memory: ") + error.what());
         }
@@ -224,7 +224,7 @@ public:
     /// Copy data of num_elements from the raw pointer on the host
     void copy_from_host(const T* host_data, const size_t num_elements) {
         try {
-            CUDA_CHECK_THROW(cudaMemcpy(data(), host_data, num_elements * sizeof(T), cudaMemcpyHostToDevice));
+            CUDA_CHECK_THROW(hipMemcpy(data(), host_data, num_elements * sizeof(T), hipMemcpyHostToDevice));
         } catch (std::runtime_error error) {
             throw std::runtime_error(std::string("Could not copy from host: ") + error.what());
         }
@@ -289,7 +289,7 @@ public:
             throw std::runtime_error(std::string("Trying to copy ") + std::to_string(num_elements) + std::string(" elements, but vector size is only ") + std::to_string(m_size));
         }
         try {
-            CUDA_CHECK_THROW(cudaMemcpy(host_data, data(), num_elements * sizeof(T), cudaMemcpyDeviceToHost));
+            CUDA_CHECK_THROW(hipMemcpy(host_data, data(), num_elements * sizeof(T), hipMemcpyDeviceToHost));
         } catch (std::runtime_error error) {
             throw std::runtime_error(std::string("Could not copy to host: ") + error.what());
         }
@@ -323,7 +323,7 @@ public:
         }
 
         try {
-            CUDA_CHECK_THROW(cudaMemcpy(m_data, other.m_data, m_size * sizeof(T), cudaMemcpyDeviceToDevice));
+            CUDA_CHECK_THROW(hipMemcpy(m_data, other.m_data, m_size * sizeof(T), hipMemcpyDeviceToDevice));
         } catch (std::runtime_error error) {
             throw std::runtime_error(std::string("Could not copy from device: ") + error.what());
         }
@@ -336,7 +336,7 @@ public:
         }
 
         try {
-            CUDA_CHECK_THROW(cudaMemcpy(m_data, other.m_data, size * sizeof(T), cudaMemcpyDeviceToDevice));
+            CUDA_CHECK_THROW(hipMemcpy(m_data, other.m_data, size * sizeof(T), hipMemcpyDeviceToDevice));
         } catch (std::runtime_error error) {
             throw std::runtime_error(std::string("Could not copy from device: ") + error.what());
         }
@@ -390,3 +390,4 @@ public:
 };
 
 }
+

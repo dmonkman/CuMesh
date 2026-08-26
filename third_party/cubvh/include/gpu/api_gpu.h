@@ -1,9 +1,9 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <ATen/cuda/CUDAContext.h>
+#include <ATen/hip/HIPContext.h>
 #include <torch/torch.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <memory>
 
 using namespace Eigen;
@@ -50,3 +50,4 @@ public:
 cuHashTable* create_cuHashTable();
 
 } // namespace cubvh
+

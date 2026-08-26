@@ -1,5 +1,6 @@
+#include "hip/hip_runtime.h"
 #pragma once
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <thrust/device_vector.h>
 #include <thrust/device_ptr.h>
 #include <thrust/sequence.h>
@@ -324,12 +325,12 @@ __device__ __constant__ int3 cornerOffset[8] = {
     {0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}
 };
 
-// Edge i  connects EDGE_CORNERS[i][0]  ↔  EDGE_CORNERS[i][1]
+// Edge i  connects EDGE_CORNERS[i][0]  ???  EDGE_CORNERS[i][1]
 // Matches the edge order required by edgeTable & triTable
 __device__ __constant__ int EDGE_CORNERS[12][2] = {
-    {0,1},{1,2},{2,3},{3,0},   // 0–3  bottom square, X Y X Y
-    {4,5},{5,6},{6,7},{7,4},   // 4–7  top    square
-    {0,4},{1,5},{2,6},{3,7}    // 8–11 vertical edges (Z)
+    {0,1},{1,2},{2,3},{3,0},   // 0???3  bottom square, X Y X Y
+    {4,5},{5,6},{6,7},{7,4},   // 4???7  top    square
+    {0,4},{1,5},{2,6},{3,7}    // 8???11 vertical edges (Z)
 };
 
 
@@ -454,7 +455,7 @@ __global__ void generateVertices(const int* coords, const float* corners,
         float denom = vb - va;
         float t;
         if (fabsf(denom) < 1e-30f)
-            t = 0.5f;                       // degenerate edge → midpoint
+            t = 0.5f;                       // degenerate edge ??? midpoint
         else {
             t = (iso - va) / denom;         // interpolate
             t = fminf(fmaxf(t, 0.f), 1.f);  // clamp numerical noise
@@ -479,7 +480,7 @@ __global__ void generateVertices(const int* coords, const float* corners,
         outKeys [base + outOfs] = key;
         ++outOfs;
     }
-    // now outOfs == __popc(mask)  ✔
+    // now outOfs == __popc(mask)  ???
 }
 
 // CUDA kernel: generate triangles (with *old* vertex indices, will remap later)
@@ -630,7 +631,7 @@ struct CornerAverage {
 
 // Host function: sparse marching cubes
 inline std::pair<thrust::device_vector<V3f>, thrust::device_vector<Tri>>
-_sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float iso, bool ensure_consistency, cudaStream_t stream) {
+_sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float iso, bool ensure_consistency, hipStream_t stream) {
     // Output containers
     thrust::device_vector<V3f> vertices; 
     thrust::device_vector<Tri> triangles;
@@ -646,7 +647,7 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
     if (ensure_consistency) {
         // Copy original corner data
         corners_copy.resize(N * 8);
-        thrust::copy(thrust::cuda::par.on(stream), 
+        thrust::copy(thrust::hip::par.on(stream), 
                      d_corners, d_corners + N * 8, 
                      corners_copy.begin());
         
@@ -673,7 +674,7 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
         
         // Create corner data structure for sorting and averaging
         thrust::device_vector<CornerData> corner_data(total_corners);
-        thrust::transform(thrust::cuda::par.on(stream),
+        thrust::transform(thrust::hip::par.on(stream),
                           thrust::counting_iterator<int>(0),
                           thrust::counting_iterator<int>(total_corners),
                           corner_data.begin(),
@@ -692,14 +693,14 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
                           });
         
         // Sort by corner coordinates
-        thrust::sort(thrust::cuda::par.on(stream), corner_data.begin(), corner_data.end());
+        thrust::sort(thrust::hip::par.on(stream), corner_data.begin(), corner_data.end());
         
         // Reduce by key to get average for each unique corner
         thrust::device_vector<CornerData> unique_corners(total_corners);
         thrust::device_vector<CornerData> corner_sums(total_corners);
         
         auto new_end = thrust::reduce_by_key(
-            thrust::cuda::par.on(stream),
+            thrust::hip::par.on(stream),
             corner_data.begin(), corner_data.end(),
             corner_data.begin(),
             unique_corners.begin(),
@@ -719,7 +720,7 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
         thrust::device_vector<int> unique_z(num_unique);
         thrust::device_vector<float> avg_vals(num_unique);
         
-        thrust::transform(thrust::cuda::par.on(stream),
+        thrust::transform(thrust::hip::par.on(stream),
                           thrust::counting_iterator<int>(0),
                           thrust::counting_iterator<int>(num_unique),
                           thrust::make_zip_iterator(thrust::make_tuple(
@@ -758,9 +759,9 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
 
     thrust::device_vector<int> prefixVert(N);
     thrust::device_vector<int> prefixTri(N);
-    thrust::exclusive_scan(thrust::cuda::par.on(stream),
+    thrust::exclusive_scan(thrust::hip::par.on(stream),
                            vertCount.begin(), vertCount.end(), prefixVert.begin());
-    thrust::exclusive_scan(thrust::cuda::par.on(stream),
+    thrust::exclusive_scan(thrust::hip::par.on(stream),
                            triCount.begin(), triCount.end(), prefixTri.begin());
 
     // Compute totals
@@ -786,11 +787,11 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
     // Create index array [0, 1, ..., M-1] to track original positions
     thrust::device_vector<int> indices(M);
     if (M > 0) {
-        thrust::sequence(thrust::cuda::par.on(stream), indices.begin(), indices.end());
+        thrust::sequence(thrust::hip::par.on(stream), indices.begin(), indices.end());
 
         // Sort by key and reorder verts and indices in one pass (no extra vertsSorted buffer)
         auto zipped_vals = thrust::make_zip_iterator(thrust::make_tuple(verts.begin(), indices.begin()));
-        thrust::sort_by_key(thrust::cuda::par.on(stream), keys.begin(), keys.end(), zipped_vals);
+        thrust::sort_by_key(thrust::hip::par.on(stream), keys.begin(), keys.end(), zipped_vals);
 
         // Build head flags using a transform iterator functor
         EdgeKey* d_keys = thrust::raw_pointer_cast(keys.data());
@@ -799,17 +800,17 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
 
         // Compute inclusive scan of head flags directly into group ids (1-based)
         thrust::device_vector<int> mapSortedToUnique(M);
-        thrust::inclusive_scan(thrust::cuda::par.on(stream), head_flags, head_flags + M, mapSortedToUnique.begin());
+        thrust::inclusive_scan(thrust::hip::par.on(stream), head_flags, head_flags + M, mapSortedToUnique.begin());
 
         // Number of unique vertices
         int uniqueCount = 0;
-        cudaMemcpyAsync(&uniqueCount, thrust::raw_pointer_cast(mapSortedToUnique.data()) + (M - 1),
-                        sizeof(int), cudaMemcpyDeviceToHost, stream);
-        cudaStreamSynchronize(stream);
+        hipMemcpyAsync(&uniqueCount, thrust::raw_pointer_cast(mapSortedToUnique.data()) + (M - 1),
+                        sizeof(int), hipMemcpyDeviceToHost, stream);
+        hipStreamSynchronize(stream);
         vertices.resize(uniqueCount);
 
         // Emit unique vertices by copying only the heads
-        thrust::copy_if(thrust::cuda::par.on(stream),
+        thrust::copy_if(thrust::hip::par.on(stream),
                         verts.begin(), verts.end(),
                         head_flags,
                         vertices.begin(),
@@ -818,11 +819,11 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
         // Build mapping from original vertex index -> new unique index
         thrust::device_vector<int> mapOrigToNew(M);
         // Convert to 0-based ids in-place and scatter back to original order
-        thrust::transform(thrust::cuda::par.on(stream),
+        thrust::transform(thrust::hip::par.on(stream),
                           mapSortedToUnique.begin(), mapSortedToUnique.end(),
                           mapSortedToUnique.begin(),
                           MinusOne());
-        thrust::scatter(thrust::cuda::par.on(stream),
+        thrust::scatter(thrust::hip::par.on(stream),
                         mapSortedToUnique.begin(), mapSortedToUnique.end(),
                         indices.begin(),
                         mapOrigToNew.begin());
@@ -844,7 +845,7 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
         // Remap triangle vertex indices to the new deduplicated indices
         if (T > 0) {
             int* d_map = thrust::raw_pointer_cast(mapOrigToNew.data());
-            thrust::for_each(thrust::cuda::par.on(stream),
+            thrust::for_each(thrust::hip::par.on(stream),
                              triangles.begin(), triangles.end(),
                              RemapTri{d_map});
         }
@@ -863,6 +864,8 @@ _sparse_marching_cubes(const int* d_coords, const float* d_corners, int N, float
         }
     }
 
-    cudaStreamSynchronize(stream);
+    hipStreamSynchronize(stream);
     return { std::move(vertices), std::move(triangles) };
 }
+
+

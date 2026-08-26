@@ -125,3 +125,5 @@ inline void merge_vertices(
 
 } // namespace cpu
 } // namespace cubvh
+
+

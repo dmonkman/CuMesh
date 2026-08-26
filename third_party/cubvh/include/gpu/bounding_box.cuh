@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #pragma once
 
 #include <gpu/common.h>
@@ -244,3 +245,5 @@ inline std::ostream& operator<< (std::ostream& os, const cubvh::BoundingBox& bb)
 }
 
 }
+
+
