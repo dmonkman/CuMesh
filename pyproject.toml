@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cumesh"
-version = "1.0_rocm10.0"
+version = "1.0+rocm10.0"
 description = "Cuda mesh utils"
 requires-python = ">=3.12"
 readme = "README.md"
